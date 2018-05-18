@@ -94,6 +94,7 @@ class FullScreenCell: UICollectionViewCell {
         }
     }
     
+    
     static func reuseIdentifier() -> String! {
         return NSStringFromClass(self)
     }
@@ -104,6 +105,10 @@ class FullScreenCell: UICollectionViewCell {
         self.scrollView.delegate = self
         self.scrollView.maximumZoomScale = 1
         self.scrollView.alwaysBounceVertical = true
+        
+        if #available(iOS 11.0, *) {
+            self.scrollView.contentInsetAdjustmentBehavior = .never
+        }
     }
     
     override func prepareForReuse() {
@@ -121,11 +126,11 @@ class FullScreenCell: UICollectionViewCell {
     
     private func applyZoomScale(_ image:UIImage, isOriginImage:Bool) {
         DispatchQueue.main.async {
+            self.scrollView.zoomScale = 1.0
+            
             guard let imageView = self.imageView else {return}
-            
             imageView.image = image
-            imageView.frame = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
-            
+
             // min scale
             let minXScale = self.scrollView.frame.size.width / image.size.width
             let minYScale = self.scrollView.frame.size.height / image.size.height
@@ -139,12 +144,20 @@ class FullScreenCell: UICollectionViewCell {
             
             if isOriginImage == true {
                 let imageViewRect = imageView.frame
-                
+
                 let xZoomScale = imageViewRect.size.width / image.size.width
                 let yZoomScale = imageViewRect.size.height / image.size.height
                 zoomScale = max(min(xZoomScale, yZoomScale), minScale)
             }
             
+            // init
+            self.scrollView.minimumZoomScale = 1
+            self.scrollView.maximumZoomScale = 1
+            self.scrollView.zoomScale = 1
+            self.scrollView.contentSize = image.size
+            
+            // set
+            imageView.frame = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
             self.scrollView.maximumZoomScale = max(1, minScale)
             self.scrollView.minimumZoomScale = minScale
             self.scrollView.zoomScale = zoomScale
@@ -155,22 +168,25 @@ class FullScreenCell: UICollectionViewCell {
     
     private func centerContent() {
         var insets = UIEdgeInsetsMake(0, 0, 0, 0);
-        
-        if self.scrollView.contentSize.width < self.bounds.width {
-            insets.left = (self.bounds.width - self.scrollView.contentSize.width) * 0.5
+
+        if self.scrollView.contentSize.width < self.scrollView.frame.width {
+            insets.left = (self.scrollView.bounds.width - self.scrollView.contentSize.width) * 0.5
         }
         insets.right = insets.left
-        
-        if self.scrollView.contentSize.height < self.bounds.height {
-            insets.top = (self.bounds.height - self.scrollView.contentSize.height) * 0.5
+
+        if self.scrollView.contentSize.height < self.scrollView.frame.height {
+            insets.top = (self.scrollView.bounds.height - self.scrollView.contentSize.height) * 0.5
         }
         insets.bottom = insets.top
-        
+
         self.scrollView.contentInset = insets
     }
 }
 
 extension FullScreenCell: UIScrollViewDelegate {
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+       print("\(scrollView.contentOffset.y)")
+    }
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.imageView
     }
