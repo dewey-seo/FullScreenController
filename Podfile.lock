@@ -1,17 +1,23 @@
 PODS:
+  - Alamofire (4.7.0)
+  - AlamofireImage (3.3.0):
+    - Alamofire (~> 4.5)
   - Neon (0.4.0)
   - SDWebImage (4.3.3):
     - SDWebImage/Core (= 4.3.3)
   - SDWebImage/Core (4.3.3)
 
 DEPENDENCIES:
+  - AlamofireImage
   - Neon
   - SDWebImage
 
 SPEC CHECKSUMS:
+  Alamofire: 907e0a98eb68cdb7f9d1f541a563d6ac5dc77b25
+  AlamofireImage: 2e784dc5d00f04903a52c1d169181469c805c3df
   Neon: 7fb5a9327e7e57911843f608e08f4893a74deaf9
   SDWebImage: de4d90b5bff3571eae7bd16202b1f43135409fa5
 
-PODFILE CHECKSUM: 18f039c50f3804177b2ac0a378c0070c6c1de211
+PODFILE CHECKSUM: 46fbcd96db8038d89b2e01c0deaf04cf826f11c7
 
 COCOAPODS: 1.3.1

@@ -7,7 +7,7 @@
 //
 
 import UIKit
-import SDWebImage
+import AlamofireImage
 
 class PhotoCell: UICollectionViewCell {
     
@@ -19,8 +19,10 @@ class PhotoCell: UICollectionViewCell {
     var data: [String:URL]? {
         didSet {
             if let data = data {
-                self.thumbImageURL = data["thumb"]
-                self.imageView.sd_setImage(with: self.thumbImageURL)
+                if let thumbImageURL = data["thumb"] {
+                    self.thumbImageURL = thumbImageURL
+                    self.imageView.sd_setImage(with: thumbImageURL, completed: nil)
+                }
             }
         }
     }

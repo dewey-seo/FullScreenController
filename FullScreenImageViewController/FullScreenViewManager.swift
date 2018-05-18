@@ -134,21 +134,17 @@ class FullScreenViewManager: NSObject {
         self.fakeView = UIImageView()
         
         if let currentCell = self.baseVC?.getCurrentFullScreenCell(), self.targetView != nil {
-            if let currentImageView = currentCell.imageView {
-                let fromRect = currentImageView.convert(currentImageView.bounds, to: nil)
-                let toRect = self.targetView?.convert((self.targetView?.bounds)!, to: nil) // check
-                
-                currentImageView.alpha = 0
-                self.baseWindow.addSubview(self.fakeView!)
-                self.fakeView?.image = currentImageView.image
-                self.fakeView?.frame = fromRect
-                
-                UIView.animate(withDuration: 0.3, animations: {
-                    self.fakeView?.frame = toRect!
-                }) { (complete) in
-                    self.hideWindow()
-                }
-            } else {
+            let fromRect = currentCell.imageView.convert(currentCell.imageView.bounds, to: nil)
+            let toRect = self.targetView?.convert((self.targetView?.bounds)!, to: nil) // check
+            
+            currentCell.imageView.alpha = 0
+            self.baseWindow.addSubview(self.fakeView!)
+            self.fakeView?.image = currentCell.imageView.image
+            self.fakeView?.frame = fromRect
+            
+            UIView.animate(withDuration: 0.3, animations: {
+                self.fakeView?.frame = toRect!
+            }) { (complete) in
                 self.hideWindow()
             }
         } else {

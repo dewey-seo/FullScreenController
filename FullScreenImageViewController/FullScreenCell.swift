@@ -8,87 +8,100 @@
 
 import UIKit
 import SDWebImage
+import Alamofire
 
 class FullScreenCell: UICollectionViewCell {
     
     @IBOutlet weak var scrollView: UIScrollView!
-    private var _placeholderImage: UIImage = UIImage()
-    private var _originalImage: UIImage = UIImage()
     
-    var imageView: UIImageView?
-    
+    var imageView: UIImageView = UIImageView()
     var needChangeImage: Bool = false
-    var placeholderImage: UIImage! {
+    
+    var _placeholderImageImage: UIImage? = nil
+    var placeholderImageIdentifier: String = ""
+    var placeholderImage: UIImage? {
         get {
-            return _placeholderImage
+            return _placeholderImageImage
         }
-        
         set {
-            _placeholderImage = newValue
-            self.applyZoomScale(_placeholderImage, isOriginImage: false)
+            if let placeholderImage = newValue {
+                self.applyZoomScale(placeholderImage, isOriginImage: false)
+            }
+            _placeholderImageImage = newValue
         }
     }
     
-    var originalImage: UIImage! {
+    var _originalImage: UIImage? = nil
+    var origianlImagerIdentifier: String = ""
+    var originalImage: UIImage? {
         get {
             return _originalImage
         }
-        
         set {
-            _originalImage = newValue
-            if self.scrollView.isZooming == true {
-                needChangeImage = true;
-            } else {
-                self.applyZoomScale(_originalImage, isOriginImage: true)
+            if let originalImage = newValue {
+                if self.scrollView.isZooming == true {
+                    needChangeImage = true;
+                } else {
+                    self.applyZoomScale(originalImage, isOriginImage: true)
+                }
             }
+            _originalImage = newValue
         }
     }
     
+    var phImageDownloadToken: SDWebImageDownloadToken?
+    var oriImageDownloadToken: SDWebImageDownloadToken?
     
     var data: [String: URL]? {
         didSet{
-            guard let data = self.data else {
-                return;
+            guard let data = self.data else {return}
+            guard let imageDownloader = SDWebImageManager.shared().imageDownloader else {return}
+            
+            if let phImageDownloadToken = self.phImageDownloadToken {
+                imageDownloader.cancel(phImageDownloadToken)
             }
             
-            let thumbnailURL = data["thumb"]
-            let originURL = data["origin"]
-            
-            var placeholderImage: UIImage? = nil
-            
-            // check cache
-            if let image = SDImageCache.shared().imageFromMemoryCache(forKey: thumbnailURL?.absoluteString) {
-                placeholderImage = image
-            } else if let image = SDImageCache.shared().imageFromDiskCache(forKey: thumbnailURL?.absoluteString) {
-                placeholderImage = image
-            }
-            
-            if let oldImageView = self.imageView {
-                if oldImageView.superview != nil {
-                    oldImageView.removeFromSuperview()
-                }
-            }
-            
-            self.imageView = UIImageView()
-            
-            if let newImageView = self.imageView {
-                self.scrollView.addSubview(newImageView)
-                self.scrollView.minimumZoomScale = 1
-                self.scrollView.maximumZoomScale = 1
-                
-                if placeholderImage != nil {
-                    self.placeholderImage = placeholderImage
-                }
-                
-                guard let downloader = SDWebImageManager.shared().imageDownloader else {return}
-                downloader.executionOrder = SDWebImageDownloaderExecutionOrder(rawValue: 1)! //(last-in-first-out)
-                
-                downloader.downloadImage(with: originURL, options: SDWebImageDownloaderOptions(rawValue: 0), progress: { (a, b, url) in
-                    print("\(url?.absoluteString ?? "unkown") : \(a) / \(b)")
-                }) { (image, data, error, result) in
-                    if image != nil {
-                        self.originalImage = image
+            if let thumbnailURL = data["thumb"] {
+                SDWebImageManager.shared().cachedImageExists(for: thumbnailURL) { [weak self] exist in
+                    if exist == true {
+                        let key = SDWebImageManager.shared().cacheKey(for: thumbnailURL)
+                        if let image = SDWebImageManager.shared().imageCache?.imageFromCache(forKey: key) {
+                            self?.placeholderImage = image
+                        }
+                    } else {
+                        self?.phImageDownloadToken = imageDownloader.downloadImage(with: thumbnailURL, options: SDWebImageDownloaderOptions(rawValue: 0), progress: { (rcv, size, url) in
+                        }, completed: { [weak self] (image, rawData, error, finished) in
+                            if let downloadedImage = image {
+                                self?.placeholderImage = downloadedImage
+                            }
+                        })
                     }
+                }
+            }
+            
+            guard let originURL = data["origin"] else {return}
+            
+            self.scrollView.minimumZoomScale = 1
+            self.scrollView.maximumZoomScale = 1
+            
+            SDWebImageManager.shared().cachedImageExists(for: originURL) { [weak self] exist in
+                if exist == true {
+                    let key = SDWebImageManager.shared().cacheKey(for: originURL)
+                    if let image = SDWebImageManager.shared().imageCache?.imageFromCache(forKey: key) {
+                        self?.originalImage = image
+                    }
+                } else {
+                    if let oriImageDownloadToken = self?.oriImageDownloadToken {
+                        imageDownloader.cancel(oriImageDownloadToken)
+                    }
+                    
+                    self?.oriImageDownloadToken = imageDownloader.downloadImage(with: originURL, options: SDWebImageDownloaderOptions(rawValue: 0), progress: { (rcv, size, url) in
+                        
+                    }, completed: { [weak self] (image, rawData, error, finished) in
+                        if let downloadedImage = image {
+                            self?.originalImage = downloadedImage
+                        }
+                    })
                 }
             }
         }
@@ -102,6 +115,8 @@ class FullScreenCell: UICollectionViewCell {
     override func awakeFromNib() {
         super.awakeFromNib()
         
+        self.scrollView.addSubview(self.imageView)
+        
         self.scrollView.delegate = self
         self.scrollView.maximumZoomScale = 1
         self.scrollView.alwaysBounceVertical = true
@@ -114,8 +129,11 @@ class FullScreenCell: UICollectionViewCell {
     override func prepareForReuse() {
         super.prepareForReuse()
         
-        self.imageView?.image = nil
-        self.imageView?.alpha = 1
+        self.placeholderImage = nil
+        self.originalImage = nil
+        
+        self.imageView.image = nil
+        self.imageView.alpha = 1
         
         self.needChangeImage = false
     }
@@ -128,8 +146,7 @@ class FullScreenCell: UICollectionViewCell {
         DispatchQueue.main.async {
             self.scrollView.zoomScale = 1.0
             
-            guard let imageView = self.imageView else {return}
-            imageView.image = image
+            self.imageView.image = image
 
             // min scale
             let minXScale = self.scrollView.frame.size.width / image.size.width
@@ -143,7 +160,7 @@ class FullScreenCell: UICollectionViewCell {
             zoomScale = max(min(xScale, yScale), minScale)
             
             if isOriginImage == true {
-                let imageViewRect = imageView.frame
+                let imageViewRect = self.imageView.frame
 
                 let xZoomScale = imageViewRect.size.width / image.size.width
                 let yZoomScale = imageViewRect.size.height / image.size.height
@@ -157,7 +174,7 @@ class FullScreenCell: UICollectionViewCell {
             self.scrollView.contentSize = image.size
             
             // set
-            imageView.frame = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
+            self.imageView.frame = CGRect(x: 0, y: 0, width: image.size.width, height: image.size.height)
             self.scrollView.maximumZoomScale = max(1, minScale)
             self.scrollView.minimumZoomScale = minScale
             self.scrollView.zoomScale = zoomScale
@@ -197,16 +214,14 @@ extension FullScreenCell: UIScrollViewDelegate {
     
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
         self.scrollViewZoomingEnd()
-        if self.needChangeImage == true {
-            self.applyZoomScale(self.originalImage, isOriginImage: true)
+        if self.needChangeImage == true, let orinalImage = self.originalImage {
+            self.applyZoomScale(orinalImage, isOriginImage: true)
             self.needChangeImage = false
         }
-        print(#function)
-        print("zoomScale: \(scale)")
     }
     
     func scrollViewZoomingEnd() {
         self.centerContent()
     }
-    
 }
+
